@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache"
 import { AutoRefresh } from "@/components/auto-refresh"
 import { ChangePasswordForm } from "@/components/change-password-form"
 import { UserManagement } from "@/components/user-management"
+import { Shield, LogOut, FileText, UserCircle, AlertCircle, CheckCircle, Clock } from "lucide-react"
 import fs from "fs/promises"
 import path from "path"
 
@@ -94,20 +95,35 @@ export default async function DashboardPage() {
     const users = userRole === 'admin' ? await prisma.user.findMany({ orderBy: { createdAt: 'desc' } }) : []
 
     return (
-        <main className="min-h-screen bg-slate-950 p-8">
+        <main className="min-h-screen p-8 text-slate-200">
             <AutoRefresh />
-            <div className="mx-auto max-w-6xl space-y-8">
+
+            {/* Background elements inherited from layout, but valid to reinforce here if needed */}
+
+            <div className="mx-auto max-w-7xl space-y-8">
 
                 {/* Header */}
-                <div className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-50">Dashboard</h1>
-                        <p className="text-slate-400">Welcome, {session?.user?.name || session?.user?.email} <span className="ml-2 rounded-full bg-blue-900/50 px-2 py-0.5 text-xs text-blue-200 uppercase">{userRole}</span></p>
+                <div className="flex flex-col md:flex-row items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/60 p-6 backdrop-blur-md shadow-lg shadow-black/20">
+                    <div className="flex items-center gap-4 mb-4 md:mb-0">
+                        <div className="bg-primary/10 p-3 rounded-full border border-primary/20">
+                            <Shield className="h-8 w-8 text-primary animate-pulse-glow" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-white tracking-tight">Secure Dashboard</h1>
+                            <div className="flex items-center gap-2 text-sm text-slate-400">
+                                <UserCircle className="h-4 w-4" />
+                                <span>{session?.user?.name || session?.user?.email}</span>
+                                <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${userRole === 'admin' ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30' : 'bg-slate-700/50 text-slate-300 border border-slate-600'}`}>
+                                    {userRole}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                     <div className="flex items-center gap-4">
                         <ChangePasswordForm />
                         <form action={SignOut}>
-                            <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white">
+                            <Button variant="outline" className="border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-red-950/50 hover:text-red-400 hover:border-red-900 transition-all group">
+                                <LogOut className="mr-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
                                 Sign Out
                             </Button>
                         </form>
@@ -116,12 +132,15 @@ export default async function DashboardPage() {
 
                 {/* User Zone */}
                 {userRole === 'user' && (
-                    <div className="grid gap-8 md:grid-cols-[400px_1fr]">
+                    <div className="grid gap-8 lg:grid-cols-[400px_1fr]">
                         <aside>
                             <UploadForm />
                         </aside>
-                        <section className="space-y-4">
-                            <h2 className="text-xl font-semibold text-slate-100">My Transfers</h2>
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-2 mb-2">
+                                <FileText className="h-5 w-5 text-primary" />
+                                <h2 className="text-xl font-semibold text-white">My Transfers</h2>
+                            </div>
                             <DashboardTable files={files} userRole="user" />
                         </section>
                     </div>
@@ -129,18 +148,33 @@ export default async function DashboardPage() {
 
                 {/* Admin Zone */}
                 {userRole === 'admin' && (
-                    <div className="space-y-8">
-                        <section>
+                    <div className="space-y-12">
+                        <div className="grid gap-8 md:grid-cols-3">
+                            {/* Stats cards could go here later */}
+                        </div>
+
+                        <section className="space-y-6">
                             <UserManagement users={users} />
                         </section>
 
-                        <section>
-                            <h2 className="text-xl font-semibold text-slate-100 mb-4">Pending Approval</h2>
+                        <section className="space-y-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <AlertCircle className="h-5 w-5 text-yellow-500" />
+                                    <h2 className="text-xl font-semibold text-white">Pending Approval</h2>
+                                </div>
+                                <span className="bg-yellow-500/10 text-yellow-500 px-3 py-1 rounded-full text-xs font-mono border border-yellow-500/20">
+                                    {files.filter(f => f.status === 'PENDING_APPROVAL').length} TASKS
+                                </span>
+                            </div>
                             <DashboardTable files={files.filter(f => f.status === 'PENDING_APPROVAL')} userRole="admin" showActions={true} />
                         </section>
 
-                        <section>
-                            <h2 className="text-xl font-semibold text-slate-100 mb-4">All Transfers Log</h2>
+                        <section className="space-y-6">
+                            <div className="flex items-center gap-2">
+                                <Clock className="h-5 w-5 text-slate-400" />
+                                <h2 className="text-xl font-semibold text-white">All Transfers Log</h2>
+                            </div>
                             <DashboardTable files={files.filter(f => f.status !== 'PENDING_APPROVAL')} userRole="admin" />
                         </section>
                     </div>
@@ -154,51 +188,61 @@ export default async function DashboardPage() {
 function DashboardTable({ files, userRole, showActions = false }: { files: any[], userRole: string, showActions?: boolean }) {
     if (files.length === 0) {
         return (
-            <div className="rounded-lg border border-slate-800 bg-slate-900/50 px-6 py-8 text-center text-slate-600">
-                No records found.
+            <div className="glass-panel rounded-xl p-12 text-center text-slate-500 flex flex-col items-center justify-center border border-dashed border-slate-800">
+                <FileText className="h-12 w-12 mb-4 opacity-20" />
+                <p>No records found in the system log.</p>
             </div>
         )
     }
 
     return (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/50 overflow-hidden">
-            <table className="w-full text-left text-sm text-slate-400">
-                <thead className="border-b border-slate-800 bg-slate-900/80 text-xs uppercase text-slate-500">
-                    <tr>
-                        <th className="px-6 py-3">Filename</th>
-                        {userRole === 'admin' && <th className="px-6 py-3">Uploader</th>}
-                        <th className="px-6 py-3">Size</th>
-                        <th className="px-6 py-3">Status</th>
-                        <th className="px-6 py-3">Date</th>
-                        {showActions && <th className="px-6 py-3">Actions</th>}
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800">
-                    {files.map((file) => (
-                        <tr key={file.id} className="hover:bg-slate-800/30 transition-colors">
-                            <td className="px-6 py-4 font-medium text-slate-200">{file.filename}</td>
-                            {userRole === 'admin' && <td className="px-6 py-4">{file.uploader?.username}</td>}
-                            <td className="px-6 py-4">{(file.size / 1024).toFixed(1)} KB</td>
-                            <td className="px-6 py-4">
-                                <StatusBadge status={file.status} />
-                            </td>
-                            <td className="px-6 py-4">{file.createdAt.toLocaleString()}</td>
-                            {showActions && (
-                                <td className="px-6 py-4">
-                                    <div className="flex gap-2">
-                                        <form action={ApproveFile.bind(null, file.id, file.filename)}>
-                                            <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white border-0 h-8">Approve</Button>
-                                        </form>
-                                        <form action={RejectFile.bind(null, file.id, file.filename)}>
-                                            <Button size="sm" variant="destructive" className="h-8">Reject</Button>
-                                        </form>
-                                    </div>
-                                </td>
-                            )}
+        <div className="glass-panel rounded-xl overflow-hidden shadow-sm">
+            <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                    <thead className="border-b border-slate-700/50 bg-slate-900/40 text-xs uppercase text-slate-400 font-mono tracking-wider">
+                        <tr>
+                            <th className="px-6 py-4">Filename</th>
+                            {userRole === 'admin' && <th className="px-6 py-4">Uploader</th>}
+                            <th className="px-6 py-4">Size</th>
+                            <th className="px-6 py-4">Status</th>
+                            <th className="px-6 py-4">Timestamp</th>
+                            {showActions && <th className="px-6 py-4 text-right">Actions</th>}
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800/50">
+                        {files.map((file) => (
+                            <tr key={file.id} className="group hover:bg-slate-800/30 transition-colors">
+                                <td className="px-6 py-4 font-medium text-slate-200 flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-slate-500 group-hover:text-primary transition-colors" />
+                                    {file.filename}
+                                </td>
+                                {userRole === 'admin' && <td className="px-6 py-4 text-slate-400">{file.uploader?.username}</td>}
+                                <td className="px-6 py-4 text-slate-400 font-mono">{(file.size / 1024).toFixed(1)} KB</td>
+                                <td className="px-6 py-4">
+                                    <StatusBadge status={file.status} />
+                                </td>
+                                <td className="px-6 py-4 text-slate-500 font-mono text-xs">{new Date(file.createdAt).toLocaleString()}</td>
+                                {showActions && (
+                                    <td className="px-6 py-4 text-right">
+                                        <div className="flex gap-2 justify-end">
+                                            <form action={ApproveFile.bind(null, file.id, file.filename)}>
+                                                <Button size="sm" className="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 border border-emerald-600/50 hover:border-emerald-500 h-8 text-xs font-mono">
+                                                    APPROVE
+                                                </Button>
+                                            </form>
+                                            <form action={RejectFile.bind(null, file.id, file.filename)}>
+                                                <Button size="sm" className="bg-red-600/20 hover:bg-red-600/40 text-red-400 border border-red-600/50 hover:border-red-500 h-8 text-xs font-mono">
+                                                    REJECT
+                                                </Button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                )}
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         </div>
     )
 }
@@ -206,17 +250,17 @@ function DashboardTable({ files, userRole, showActions = false }: { files: any[]
 function StatusBadge({ status }: { status: string }) {
     const styles = {
         RECEIVED: 'border-slate-700 bg-slate-800 text-slate-400',
-        SCANNING: 'border-yellow-900/50 bg-yellow-950/30 text-yellow-500 animate-pulse',
-        PENDING_APPROVAL: 'border-blue-900/50 bg-blue-950/30 text-blue-400',
-        TRANSFERRED: 'border-green-900/50 bg-green-950/30 text-green-500',
-        QUARANTINED: 'border-red-900/50 bg-red-950/30 text-red-500',
-        REJECTED: 'border-red-900/50 bg-red-950/30 text-red-500',
+        SCANNING: 'border-yellow-500/30 bg-yellow-500/10 text-yellow-500 animate-pulse',
+        PENDING_APPROVAL: 'border-blue-500/30 bg-blue-500/10 text-blue-400',
+        TRANSFERRED: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+        QUARANTINED: 'border-red-500/30 bg-red-500/10 text-red-500',
+        REJECTED: 'border-rose-500/30 bg-rose-500/10 text-rose-500',
     }[status] || 'border-slate-800 bg-slate-900 text-slate-400'
 
     return (
-        <span className={`inline - flex items - center rounded - full px - 2.5 py - 0.5 text - xs font - medium border ${styles} `}>
-            {status === 'SCANNING' && <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-yellow-500"></span>}
-            {status}
+        <span className={`inline-flex items-center rounded-sm px-2.5 py-1 text-[10px] font-bold border uppercase tracking-wide shadow-sm ${styles}`}>
+            {status === 'SCANNING' && <span className="mr-1.5 h-1.5 w-1.5 rounded-full bg-yellow-500 animate-ping"></span>}
+            {status.replace('_', ' ')}
         </span>
     )
 }

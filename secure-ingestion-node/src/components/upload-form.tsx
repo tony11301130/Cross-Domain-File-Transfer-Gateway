@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
+import { UploadCloud, CheckCircle, AlertCircle } from "lucide-react"
 
 export function UploadForm() {
     const [file, setFile] = useState<File | null>(null)
@@ -13,6 +14,7 @@ export function UploadForm() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files) {
             setFile(e.target.files[0])
+            setMessage("")
         }
     }
 
@@ -52,24 +54,56 @@ export function UploadForm() {
     }
 
     return (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-6 shadow-sm backdrop-blur-xl">
-            <h2 className="mb-4 text-xl font-semibold text-slate-100">Upload New File</h2>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid w-full items-center gap-1.5">
-                    <input
-                        id="file-upload"
-                        type="file"
-                        onChange={handleFileChange}
-                        disabled={uploading}
-                        className="flex h-10 w-full rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    />
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-6 shadow-md backdrop-blur-xl animate-float">
+            <div className="flex items-center gap-2 mb-4">
+                <div className="bg-primary/20 p-2 rounded-lg">
+                    <UploadCloud className="h-6 w-6 text-primary" />
                 </div>
+                <h2 className="text-xl font-bold text-white tracking-tight">Secure Ingress</h2>
+            </div>
+
+            <p className="text-slate-400 text-sm mb-6 leading-relaxed">
+                Initiate secure file transfer. Files will be scanned and sanitized before crossing the domain boundary.
+            </p>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                    <label className="text-xs uppercase text-slate-500 font-bold tracking-wider">Select Payload</label>
+                    <div className="relative group">
+                        <input
+                            id="file-upload"
+                            type="file"
+                            onChange={handleFileChange}
+                            disabled={uploading}
+                            className="flex h-32 w-full rounded-lg border-2 border-dashed border-slate-700 bg-slate-900/50 px-3 py-2 text-sm text-slate-100 file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer hover:border-primary/50 hover:bg-slate-900 transition-all text-center file:hidden pt-10"
+                        />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                            {file ? (
+                                <div className="text-center">
+                                    <p className="font-bold text-primary mb-1">{file.name}</p>
+                                    <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(2)} KB</p>
+                                </div>
+                            ) : (
+                                <div className="text-center text-slate-500 group-hover:text-slate-300 transition-colors">
+                                    <p className="mb-1">Drag file here or click to browse</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
                 <div className="flex items-center justify-between">
-                    <span className={`text-sm ${message.includes("Error") ? "text-red-400" : "text-green-400"}`}>
-                        {message}
-                    </span>
-                    <Button type="submit" disabled={!file || uploading}>
-                        {uploading ? "Uploading..." : "Transfer File"}
+                    {message ? (
+                        <div className={`flex items-center gap-2 text-sm ${message.includes("Error") ? "text-red-400" : "text-emerald-400"}`}>
+                            {message.includes("Error") ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                            <span className="font-medium">{message}</span>
+                        </div>
+                    ) : (
+                        <span className="text-xs text-slate-600 font-mono">ENCRYPTION: AES-256-GCM</span>
+                    )}
+
+                    <Button type="submit" disabled={!file || uploading} size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-lg shadow-primary/20 transition-all active:scale-95">
+                        {uploading ? "Transmitting..." : "Init Transfer"}
                     </Button>
                 </div>
             </form>
