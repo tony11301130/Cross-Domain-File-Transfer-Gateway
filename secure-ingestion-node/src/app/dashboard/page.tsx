@@ -6,6 +6,7 @@ import { UploadForm } from "@/components/upload-form"
 import { Button } from "@/components/ui/button"
 import { revalidatePath } from "next/cache"
 import { AutoRefresh } from "@/components/auto-refresh"
+import { ChangePasswordForm } from "@/components/change-password-form"
 import fs from "fs/promises"
 import path from "path"
 
@@ -99,11 +100,14 @@ export default async function DashboardPage() {
                         <h1 className="text-2xl font-bold text-slate-50">Dashboard</h1>
                         <p className="text-slate-400">Welcome, {session?.user?.name || session?.user?.email} <span className="ml-2 rounded-full bg-blue-900/50 px-2 py-0.5 text-xs text-blue-200 uppercase">{userRole}</span></p>
                     </div>
-                    <form action={SignOut}>
-                        <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white">
-                            Sign Out
-                        </Button>
-                    </form>
+                    <div className="flex items-center gap-4">
+                        <ChangePasswordForm />
+                        <form action={SignOut}>
+                            <Button variant="outline" className="border-slate-700 bg-transparent text-slate-300 hover:bg-slate-800 hover:text-white">
+                                Sign Out
+                            </Button>
+                        </form>
+                    </div>
                 </div>
 
                 {/* User Zone */}
