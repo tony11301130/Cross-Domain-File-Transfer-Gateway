@@ -1,0 +1,14 @@
+
+fastapi
+uvicorn
+python-magic
+python-multipart
+Pillow
+python-docx
+openpyxl
+python-pptx
+pdfrw
+redis
+prometheus_client
+requests
+pikepdf

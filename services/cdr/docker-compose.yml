@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  cdr-api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - UPLOAD_DIR=/app/uploads
+    depends_on:
+      - redis
+    volumes:
+      - shared-data:/app/uploads
+
+  cdr-worker:
+    build: .
+    command: [ "python", "worker.py" ]
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - UPLOAD_DIR=/app/uploads
+    depends_on:
+      - redis
+      - cdr-api
+    volumes:
+      - shared-data:/app/uploads
+
+volumes:
+  shared-data:

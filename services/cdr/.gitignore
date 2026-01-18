@@ -1,0 +1,19 @@
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
+.env
+
+# Uploads and temporary files
+app/uploads/
+uploads/
+*.sanitized
+*.log
+temp_*
+
+# IDEs
+.vscode/
+.idea/

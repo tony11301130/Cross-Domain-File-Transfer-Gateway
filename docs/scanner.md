@@ -123,16 +123,16 @@ graph TD
         KVM[KVM Hypervisor<br>(Kernel Level)]
         
         subgraph "Docker Environment"
-            Web[Web Service<br>(Next.js)]
-            Hub[Scanner Hub]
-            AV[ClamAV]
-            CDR[CDR Engine]
-            
-            CapeHost[CAPEv2 Host<br>(Privileged Container)]
+        Web[Web Service<br>(Next.js)]
+        Hub[Scanner Hub]
+        AV[ClamAV]
+        CDR[CDR Engine]
+        
+        CapeHost[CAPEv2 Host<br>(Privileged Container)]
         end
         
         subgraph "Virtual Machines"
-            WinVM[Windows Sandbox<br>(Guest VM)]
+        WinVM[Windows Sandbox<br>(Guest VM)]
         end
         
         Web --> Hub
@@ -163,3 +163,96 @@ Scanner Hub 將透過 REST API 與 CAPEv2 溝通，無需直接操作資料庫�
 | **查詢狀態** | `GET` | `/tasks/view/{task_id}/` | 檢查 status 是否為 `reported` |
 | **取得報告** | `GET` | `/tasks/get/report/{task_id}/` | 回傳完整分析報告 (JSON) |
 
+# 實作計畫 - CDR (檔案無害化與重建) 服務
+
+## 1. 目標描述
+
+設計並實作一個 **CDR (Content Disarm and Reconstruction)** 服務，作為檔案傳輸閘道的關鍵組件。
+此服務將能夠通過從有效數據重建檔案來「清洗」常見檔案格式 (文件、圖片)，有效地剝離惡意主動內容 (巨集、腳本、嵌入物件)。
+
+基於用戶反饋：
+1.  **架構**：CDR 將是一個 **獨立的微服務 (Microservice)**。
+2.  **流程策略**：
+    *   **路徑 A (可清洗)**：檔案進入 CDR。如果 CDR 失敗或結果不明確，則升級至沙箱 (Sandbox)。
+    *   **路徑 B (高風險/不可清洗)**：檔案直接進入沙箱 (節省沙箱資源給必要的檔案)。
+3.  **引擎**：基於 **開源 (Open Source)** 函式庫構建。
+
+## 2. 需要用戶審閱
+
+> [!IMPORTANT]
+> **開源 CDR 的限制**：
+> 與商業解決方案 (OPSWAT, Glasswall) 不同，開源 "CDR" 通常是函式庫的集合 (例如 `PyMuPDF`, `python-docx`, `Pillow`)。
+> - **權衡**：功能支援可能較不全面。我們將構建一個「盡力而為 (Best Effort)」的重建引擎。
+> - **初始範圍**：我們將專注於：
+>   - **PDF**: 重新渲染/剝離 JS。
+>   - **Office (DOCX/XLSX/PPTX)**: 基於 XML 的重建 (剝離 Macros/VBA)。
+>   - **Images**: 轉碼 (例如 PNG->BMP->PNG) 以剝離元數據/隱寫術。
+
+## 3. 擬定架構
+
+### 系統圖
+
+```mermaid
+graph TD
+    Client[Gateway / Controller] -->|File Submission| Router[Scanner Hub / Router]
+    
+    Router -->|Policy Check: Is Sanitizable?| Decision{Type?}
+    
+    Decision -->|PDF/Office/Image| CDR_Service[CDR Microservice]
+    Decision -->|Exe/Script/Other| Sandbox[Sandbox (CAPEv2)]
+    
+    CDR_Service -->|Success: Clean File| Result_Clean[Clean File Storage]
+    CDR_Service -->|Failure/Error| Sandbox
+    
+    Sandbox -->|Analysis Report| Result_Report[Security Report]
+```
+
+### 組件：CDR 微服務
+
+*   **類型**: Docker Container (Python API).
+*   **介面**: REST API (`POST /sanitize`, `GET /status`).
+*   **核心函式庫**:
+    *   `pdf-redactor` / `pikepdf` / `PyMuPDF` (PDFs)
+    *   `python-docx`, `openpyxl` (Office)
+    *   `Pillow` (Images)
+
+## 4. 擬定變更
+
+### [New Module] `services/cdr_service`
+
+我們將創建一個新的目錄 `services/cdr` 結構，遵循嚴格的微服務模式。
+
+#### [NEW] `services/cdr/Dockerfile`
+- Python 3.11-slim base.
+- 相依性: `fastapi`, `uvicorn`, `python-magic`, `pdf-redactor`, `openpyxl`, `python-docx`, `Pillow`.
+
+#### [NEW] `services/cdr/app/main.py`
+- FastAPI 入口點。
+- Endpoints:
+    - `/health`: 健康檢查。
+    - `/sanitize`: 處理檔案的非同步任務。
+
+#### [NEW] `services/cdr/app/engine.py`
+- **工廠模式 (Factory Pattern)** 用於 sanitizer。
+- Classes:
+    - `PDFSanitizer`: 壓平表單，移除 JS。
+    - `OfficeSanitizer`: 重建 XML，丟棄 `vbaProject.bin`。
+    - `ImageSanitizer`: 重新編碼圖片以剝離元數據。
+
+### [Modify] `docs/scanner.md`
+- 更新系統架構章節以包含 CDR 流程。
+- 添加「開源 CDR」引擎規格。
+
+## 5. 驗證計畫
+
+### 自動化測試
+- **單元測試**: 使用惡意樣本 (例如含 JS 的 PDF，含 Macro 的 DOCX) 測試每個 Sanitizer class。
+    - *預期*: 輸出檔案存在，檔案大小改變，macro 代碼消失。
+- **整合測試**: 發送 HTTP請求到 CDR API，驗證是否返回乾淨檔案。
+
+### 手動驗證
+1.  构建 CDR Docker image。
+2.  發送一個 "啟用 Macro 的 Word 文件" 到服務。
+3.  打開返回的檔案：驗證文字內容保留，但 Macros 已消失。
+4.  發送一個含 Javascript 的 PDF。
+5.  驗證 Javascript 動作已被移除。
