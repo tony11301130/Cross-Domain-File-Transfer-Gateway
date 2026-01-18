@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { revalidatePath } from "next/cache"
 import { AutoRefresh } from "@/components/auto-refresh"
 import { ChangePasswordForm } from "@/components/change-password-form"
+import { UserManagement } from "@/components/user-management"
 import fs from "fs/promises"
 import path from "path"
 
@@ -89,6 +90,9 @@ export default async function DashboardPage() {
         })
     }
 
+    // Fetch all users for Admin
+    const users = userRole === 'admin' ? await prisma.user.findMany({ orderBy: { createdAt: 'desc' } }) : []
+
     return (
         <main className="min-h-screen bg-slate-950 p-8">
             <AutoRefresh />
@@ -126,6 +130,10 @@ export default async function DashboardPage() {
                 {/* Admin Zone */}
                 {userRole === 'admin' && (
                     <div className="space-y-8">
+                        <section>
+                            <UserManagement users={users} />
+                        </section>
+
                         <section>
                             <h2 className="text-xl font-semibold text-slate-100 mb-4">Pending Approval</h2>
                             <DashboardTable files={files.filter(f => f.status === 'PENDING_APPROVAL')} userRole="admin" showActions={true} />
