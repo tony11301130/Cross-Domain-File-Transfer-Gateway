@@ -1,0 +1,28 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  passwordHash  String
+  role          String    @default("user") // "user" or "admin"
+  createdAt     DateTime  @default(now())
+  files         FileRecord[]
+}
+
+model FileRecord {
+  id          String   @id @default(cuid())
+  filename    String
+  size        Int
+  status      String   @default("RECEIVED") // RECEIVED, SCANNING, PENDING_APPROVAL, TRANSFERRED, QUARANTINED, REJECTED
+  uploaderId  String
+  uploader    User     @relation(fields: [uploaderId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

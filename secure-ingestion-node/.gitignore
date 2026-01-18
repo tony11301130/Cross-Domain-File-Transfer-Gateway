@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Next.js build output
+.next/
+
+# Environment keys
+.env
+.env.local
+
+# Logs
+logs/
+*.log
+
+# Storage (uploaded files)
+storage/
+
+# Database (SQLite)
+*.db
+*.sqlite
+prisma/dev.db
+
+# Editor directories
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+test_upload.txt

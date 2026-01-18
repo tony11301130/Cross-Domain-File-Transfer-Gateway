@@ -1,0 +1,35 @@
+services:
+  web:
+    build: .
+    container_name: ingestion-web
+    ports:
+      - "3000:3000"
+    user: root
+    environment:
+      - DATABASE_URL=file:/app/db/dev.db
+      - NEXTAUTH_SECRET=supersecret123
+      - NEXTAUTH_URL=http://localhost:3000
+    volumes:
+      - db-data:/app/db
+      - ingestion-storage:/app/storage
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ingestion-worker
+    user: root
+    # command: [ "tail", "-f", "/dev/null" ] # Phase 1 Placeholder: Keep container running without worker script
+    command: [ "node", "worker/index.js" ] # Will be enabled in Phase 3
+    # For now, we reuse the same image but this command would fail if script is missing.
+    # We will just run a dummy keep-alive for Phase 1 verification if needed or comment it out.
+    # For Phase 1 Verification, we only strictly need 'web'.
+    environment:
+      - DATABASE_URL=file:/app/db/dev.db
+    volumes:
+      - db-data:/app/db
+      - ingestion-storage:/app/storage
+
+volumes:
+  db-data:
+  ingestion-storage:
