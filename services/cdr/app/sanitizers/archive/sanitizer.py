@@ -8,6 +8,7 @@ from .config import MAX_DEPTH
 from .extractor import ArchiveExtractor
 from .repacker import ArchiveRepacker
 from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
+from app.core.exceptions import PasswordRequiredError
 
 class ArchiveSanitizer:
     def __init__(self, file_type: str, get_sanitizer_func):
@@ -17,7 +18,7 @@ class ArchiveSanitizer:
         self.extractor = ArchiveExtractor(file_type)
         self.repacker = ArchiveRepacker(file_type)
 
-    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
         report = SanitizationReport()
         try:
             # We need to save to disk because zipfile/tarfile/py7zr often needs seekable or filename
@@ -34,27 +35,31 @@ class ArchiveSanitizer:
             extract_dir = tempfile.mkdtemp()
             
             try:
-                if not self.extractor.safe_extract(tmp_in_path, extract_dir):
+                if not self.extractor.safe_extract(tmp_in_path, extract_dir, password=password):
                     report.add_log(ActionEnum.BLOCK, "Extraction failed or unsafe archive (ZipBomb?)", "Structure")
                     report.is_safe = False
                     return None, report
+            except PasswordRequiredError as e:
+                report.add_log(ActionEnum.NEED_PASSWORD, str(e), "Encryption")
+                report.requires_password = True
+                return None, report
 
-                # Process extracted files
-                self._process_directory(extract_dir, policy, report)
+            # Process extracted files
+            self._process_directory(extract_dir, policy, report)
 
-                # Repack
-                output_buffer = io.BytesIO()
-                self.repacker.repack(extract_dir, output_buffer)
-                
-                report.is_safe = True
-                report.method_used = "surgical"
-                return output_buffer.getvalue(), report
+            # Repack
+            output_buffer = io.BytesIO()
+            self.repacker.repack(extract_dir, output_buffer)
+            
+            report.is_safe = True
+            report.method_used = "surgical"
+            return output_buffer.getvalue(), report
 
-            finally:
-                if os.path.exists(tmp_in_path):
-                    os.remove(tmp_in_path)
-                if os.path.exists(extract_dir):
-                    shutil.rmtree(extract_dir)
+        finally:
+            if os.path.exists(tmp_in_path):
+                os.remove(tmp_in_path)
+            if os.path.exists(extract_dir):
+                shutil.rmtree(extract_dir)
 
         except Exception as e:
             print(f"[ArchiveSanitizer] Error: {e}")

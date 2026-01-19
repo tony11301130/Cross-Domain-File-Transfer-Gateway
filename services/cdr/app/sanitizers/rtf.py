@@ -4,7 +4,7 @@ from .base import BaseSanitizer
 from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
 
 class RtfSanitizer(BaseSanitizer):
-    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
         report = SanitizationReport()
         try:
             content = input_file.read()

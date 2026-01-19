@@ -13,6 +13,8 @@ import {
 } from "lucide-react"
 import fs from "fs/promises"
 import path from "path"
+import { getRedisClient, submitPassword } from "@/lib/queue"
+
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +75,22 @@ async function RejectFile(fileId: string, filename: string) {
     }
 }
 
+async function SubmitFilePassword(fileId: string, formData: FormData) {
+    "use server"
+    const password = formData.get("password") as string
+    if (!password) return
+
+    const success = await submitPassword(fileId, password)
+    if (success) {
+        await prisma.fileRecord.update({
+            where: { id: fileId },
+            data: { status: 'SCANNING' }
+        })
+        revalidatePath("/dashboard")
+    }
+}
+
+
 export default async function DashboardPage() {
     const session = await auth()
     const userRole = (session?.user as any).role
@@ -88,15 +106,48 @@ export default async function DashboardPage() {
             include: { uploader: true }
         })
 
+    // Sync Logic with Redis status
+    const activeFiles = files.filter(f => ['RECEIVED', 'SCANNING', 'WAITING_PASSWORD'].includes(f.status));
+    if (activeFiles.length > 0) {
+        try {
+            const redis = getRedisClient();
+            for (const file of activeFiles) {
+                const redisData = await redis.get(`cdr_result:${file.id}`);
+                if (redisData) {
+                    const result = JSON.parse(redisData);
+                    let newStatus = file.status;
+
+                    if (result.status === 'completed') newStatus = 'PENDING_APPROVAL';
+                    else if (result.status === 'failed') newStatus = 'QUARANTINED';
+                    else if (result.status === 'waiting_password') newStatus = 'WAITING_PASSWORD';
+                    else if (result.status === 'processing') newStatus = 'SCANNING';
+                    else if (result.status === 'queued') newStatus = 'RECEIVED';
+
+                    if (newStatus !== file.status) {
+                        await prisma.fileRecord.update({
+                            where: { id: file.id },
+                            data: { status: newStatus }
+                        });
+                        file.status = newStatus;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Redis Sync Error", e);
+        }
+    }
+
     const users = userRole === 'admin' ? await prisma.user.findMany({ orderBy: { createdAt: 'desc' } }) : []
+
 
     // Stats Calculation
     const stats = {
         total: files.length,
-        pending: files.filter(f => f.status === 'PENDING_APPROVAL' || f.status === 'RECEIVED' || f.status === 'SCANNING').length,
+        pending: files.filter(f => f.status === 'PENDING_APPROVAL' || f.status === 'RECEIVED' || f.status === 'SCANNING' || f.status === 'WAITING_PASSWORD').length,
         success: files.filter(f => f.status === 'TRANSFERRED').length,
         failed: files.filter(f => f.status === 'REJECTED' || f.status === 'QUARANTINED').length
     }
+
 
     return (
         <main className="min-h-screen p-4 md:p-8 text-slate-200 grid-bg">
@@ -264,8 +315,9 @@ function DashboardTable({ files, userRole, showActions = false }: { files: any[]
                             <th className="px-6 py-5">Volume</th>
                             <th className="px-6 py-5">Integrity</th>
                             <th className="px-6 py-5">Timeline</th>
-                            {showActions && <th className="px-6 py-5 text-right">Clearance</th>}
+                            {(showActions || userRole === 'user') && <th className="px-6 py-5 text-right">Actions</th>}
                         </tr>
+
                     </thead>
                     <tbody className="divide-y divide-slate-800/40">
                         {files.map((file) => (
@@ -280,23 +332,42 @@ function DashboardTable({ files, userRole, showActions = false }: { files: any[]
                                     <StatusBadge status={file.status} />
                                 </td>
                                 <td className="px-6 py-4 text-slate-500 font-mono text-[10px] tracking-tight">{new Date(file.createdAt).toLocaleString()}</td>
-                                {showActions && (
+                                {(showActions || (userRole === 'user' && file.status === 'WAITING_PASSWORD')) && (
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex gap-2 justify-end">
-                                            <form action={ApproveFile.bind(null, file.id, file.filename)}>
-                                                <Button size="sm" className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 h-8 px-3 text-[10px] font-black tracking-widest">
-                                                    ALLOW
-                                                </Button>
-                                            </form>
-                                            <form action={RejectFile.bind(null, file.id, file.filename)}>
-                                                <Button size="sm" className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 h-8 px-3 text-[10px] font-black tracking-widest">
-                                                    DENY
-                                                </Button>
-                                            </form>
+                                            {showActions && (
+                                                <>
+                                                    <form action={ApproveFile.bind(null, file.id, file.filename)}>
+                                                        <Button size="sm" className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 h-8 px-3 text-[10px] font-black tracking-widest">
+                                                            ALLOW
+                                                        </Button>
+                                                    </form>
+                                                    <form action={RejectFile.bind(null, file.id, file.filename)}>
+                                                        <Button size="sm" className="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 h-8 px-3 text-[10px] font-black tracking-widest">
+                                                            DENY
+                                                        </Button>
+                                                    </form>
+                                                </>
+                                            )}
+                                            {userRole === 'user' && file.status === 'WAITING_PASSWORD' && (
+                                                <form action={SubmitFilePassword.bind(null, file.id)} className="flex gap-2">
+                                                    <input
+                                                        type="password"
+                                                        name="password"
+                                                        placeholder="Enter Password"
+                                                        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[10px] w-32 focus:border-cyan-500 focus:outline-none"
+                                                        required
+                                                    />
+                                                    <Button size="sm" className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 h-8 px-3 text-[10px] font-black tracking-widest">
+                                                        SUBMIT
+                                                    </Button>
+                                                </form>
+                                            )}
                                         </div>
                                     </td>
                                 )}
                             </tr>
+
                         ))}
                     </tbody>
                 </table>
@@ -310,7 +381,9 @@ function StatusBadge({ status }: { status: string }) {
         RECEIVED: 'border-slate-700/50 bg-slate-800/40 text-slate-500',
         SCANNING: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-400 animate-pulse',
         PENDING_APPROVAL: 'border-blue-500/30 bg-blue-500/10 text-blue-400 font-bold',
+        WAITING_PASSWORD: 'border-amber-500/30 bg-amber-500/10 text-amber-400 font-bold',
         TRANSFERRED: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400',
+
         QUARANTINED: 'border-red-500/30 bg-red-500/10 text-red-500 font-black',
         REJECTED: 'border-rose-500/30 bg-rose-500/10 text-rose-500',
     }

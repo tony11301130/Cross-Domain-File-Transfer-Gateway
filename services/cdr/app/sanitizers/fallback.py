@@ -19,7 +19,7 @@ class FallbackSanitizer(BaseSanitizer):
         self.mime_type = mime_type
         self.converter = SafeConverter()
         
-    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
         report = SanitizationReport(is_safe=False, logs=[], method_used="fallback")
         
         # We need a physical file to process with external tools

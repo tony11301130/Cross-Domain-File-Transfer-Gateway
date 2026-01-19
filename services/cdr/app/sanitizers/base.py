@@ -10,7 +10,7 @@ class BaseSanitizer(abc.ABC):
     """
 
     @abc.abstractmethod
-    def sanitize(self, input_file: BinaryIO, policy: 'SanitizationPolicy') -> Tuple[Optional[bytes], 'SanitizationReport']:
+    def sanitize(self, input_file: BinaryIO, policy: 'SanitizationPolicy', password: Optional[str] = None) -> Tuple[Optional[bytes], 'SanitizationReport']:
         """
         Sanitize the input file and return the sanitized content and a report.
         

@@ -8,6 +8,7 @@ from .base import BaseSanitizer
 from .archive.extractor import ArchiveExtractor
 from .archive.repacker import ArchiveRepacker
 from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
+from app.core.exceptions import PasswordRequiredError
 
 # XML Namespaces typically found in OOXML
 NAMESPACES = {
@@ -26,7 +27,7 @@ class SurgicalOfficeSanitizer(BaseSanitizer):
         self.extractor = ArchiveExtractor(mime_type)
         self.repacker = ArchiveRepacker(mime_type)
 
-    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
         report = SanitizationReport()
         temp_dir = tempfile.mkdtemp()
         temp_in_path = None
@@ -38,10 +39,15 @@ class SurgicalOfficeSanitizer(BaseSanitizer):
                 temp_in_path = tmp_in.name
 
             # 1. Unzip with security checks (Zip Bomb, etc)
-            if not self.extractor.safe_extract(temp_in_path, temp_dir):
-                print("[Office] Extraction failed or unsafe file.")
-                report.add_log(ActionEnum.BLOCK, "Unsafe archive structure (ZipBomb?)", "Structure")
-                report.is_safe = False
+            try:
+                if not self.extractor.safe_extract(temp_in_path, temp_dir, password=password):
+                    print("[Office] Extraction failed or unsafe file.")
+                    report.add_log(ActionEnum.BLOCK, "Unsafe archive structure (ZipBomb?)", "Structure")
+                    report.is_safe = False
+                    return None, report
+            except PasswordRequiredError as e:
+                report.add_log(ActionEnum.NEED_PASSWORD, str(e), "Encryption")
+                report.requires_password = True
                 return None, report
 
             # 2. Iterate and Clean

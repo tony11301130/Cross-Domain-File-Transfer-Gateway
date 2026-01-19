@@ -1,6 +1,11 @@
-import zipfile
+try:
+    import pyzipper as zipfile
+except ImportError:
+    import zipfile
 import tarfile
 import os
+from typing import Optional
+from app.core.exceptions import PasswordRequiredError
 try:
     import py7zr
 except ImportError:
@@ -11,10 +16,10 @@ class ArchiveExtractor:
     def __init__(self, file_type: str):
         self.file_type = file_type
 
-    def safe_extract(self, archive_path: str, extract_path: str) -> bool:
+    def safe_extract(self, archive_path: str, extract_path: str, password: Optional[str] = None) -> bool:
         try:
             if "7z" in self.file_type:
-                return self._safe_extract_7z(archive_path, extract_path)
+                return self._safe_extract_7z(archive_path, extract_path, password=password)
             
             # Default to ZIP logic (improved with tar check if needed)
             if not zipfile.is_zipfile(archive_path):
@@ -25,8 +30,21 @@ class ArchiveExtractor:
                 return False
 
             with zipfile.ZipFile(archive_path, 'r') as zf:
+                if password:
+                    zf.setpassword(password.encode())
                 # 1. Check total files
                 file_list = zf.infolist()
+                
+                # Check for encryption
+                for info in file_list:
+                    if info.flag_bits & 0x1:
+                        if not password:
+                            print(f"[Archive] ZIP is password protected: {info.filename}")
+                            raise PasswordRequiredError(f"ZIP file contains encrypted component: {info.filename}")
+                        else:
+                            # If password provided, it will be used by setpassword and extractall
+                            print(f"[Archive] Extracting encrypted component with provided password: {info.filename}")
+
                 if len(file_list) > MAX_FILES:
                     print(f"[Archive] Modified Zip Bomb: Too many files ({len(file_list)})")
                     return False
@@ -57,17 +75,22 @@ class ArchiveExtractor:
         except zipfile.BadZipFile:
             print("[Archive] Bad Zip File")
             return False
+        except PasswordRequiredError:
+            raise
         except Exception as e:
             print(f"[Archive] Extraction Error: {e}")
             return False
 
-    def _safe_extract_7z(self, archive_path: str, extract_path: str) -> bool:
+    def _safe_extract_7z(self, archive_path: str, extract_path: str, password: Optional[str] = None) -> bool:
         if py7zr is None:
             print("[Archive] py7zr module not installed. Skipping 7z extraction.")
             return False
             
         try:
-            with py7zr.SevenZipFile(archive_path, mode='r') as z:
+            with py7zr.SevenZipFile(archive_path, mode='r', password=password) as z:
+                if z.needs_password() and not password:
+                     print(f"[Archive] 7z is password protected")
+                     raise PasswordRequiredError("7z archive is password protected")
                 # py7zr doesn't give easy list without reading, but let's try strict extract
                 # Limitations: 7z usually solid compression, hard to check ratios per file without full scan.
                 # simpler check:
@@ -77,6 +100,8 @@ class ArchiveExtractor:
                 
                 z.extractall(path=extract_path)
                 return True
+        except PasswordRequiredError:
+            raise
         except Exception as e:
             print(f"[Archive] 7z Extract Error: {e}")
             return False

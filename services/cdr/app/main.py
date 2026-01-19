@@ -58,3 +58,15 @@ async def get_status(job_id: str):
     if not status:
         raise HTTPException(status_code=404, detail="Job not found")
     return status
+
+@app.post("/status/{job_id}/password")
+async def submit_password(job_id: str, data: dict):
+    password = data.get("password")
+    if not password:
+        raise HTTPException(status_code=400, detail="Password is required")
+    
+    success = queue_manager.re_enqueue_with_password(job_id, password)
+    if not success:
+        raise HTTPException(status_code=404, detail="Job not found or not in waiting state")
+        
+    return {"job_id": job_id, "status": "re-queued"}

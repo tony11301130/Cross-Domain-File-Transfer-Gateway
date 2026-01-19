@@ -16,6 +16,7 @@ class ActionEnum(str, Enum):
     CONVERT = "convert"
     RECONSTRUCT = "reconstruct"
     DETECT = "detect"
+    NEED_PASSWORD = "need_password"
 
 class SanitizationLog(BaseModel):
     timestamp: float = Field(default_factory=time.time)
@@ -26,6 +27,7 @@ class SanitizationLog(BaseModel):
 
 class SanitizationReport(BaseModel):
     is_safe: bool = False
+    requires_password: bool = False
     method_used: str = "surgical" # "surgical", "fallback", "none"
     logs: List[SanitizationLog] = []
 

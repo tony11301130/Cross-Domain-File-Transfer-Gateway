@@ -17,7 +17,7 @@ class HtmlSanitizer(BaseSanitizer):
             'img': ['src', 'alt', 'width', 'height'],
         }
     
-    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
         report = SanitizationReport()
         try:
             content = input_file.read().decode('utf-8', errors='ignore')
@@ -58,7 +58,7 @@ class SvgSanitizer(BaseSanitizer):
             'path': ['d', 'fill', 'stroke', 'stroke-width'],
         }
         
-    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
         report = SanitizationReport()
         try:
             content = input_file.read().decode('utf-8', errors='ignore')

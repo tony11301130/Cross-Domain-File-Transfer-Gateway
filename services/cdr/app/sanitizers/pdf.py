@@ -5,11 +5,16 @@ from .base import BaseSanitizer
 from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
 
 class PDFSanitizer(BaseSanitizer):
-    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
         report = SanitizationReport()
         try:
             # Using pikepdf (QPDF based) for robust structural cleaning
-            pdf = pikepdf.open(input_file)
+            try:
+                pdf = pikepdf.open(input_file, password=password if password else "")
+            except (pikepdf.PasswordError, pikepdf.EncryptionError):
+                report.add_log(ActionEnum.NEED_PASSWORD, "PDF is password protected", "Encryption")
+                report.requires_password = True
+                return None, report
             
             # 1. Remove JavaScript
             # Iterate all names and remove /JS or /JavaScript

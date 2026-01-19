@@ -43,6 +43,28 @@ class QueueManager:
             return None
             
         return job_id
+        
+    def re_enqueue_with_password(self, job_id: str, password: str) -> bool:
+        if not self.redis:
+            return False
+        
+        # Get current job data
+        status = self.get_job_status(job_id)
+        if not status:
+            return False
+            
+        # Clear old error/status
+        status["status"] = "queued"
+        status["password"] = password
+        if "error" in status:
+            del status["error"]
+        
+        # Update status in Redis
+        self.redis.setex(f"{RESULT_PREFIX}{job_id}", 3600, json.dumps(status))
+        
+        # Push back to queue
+        self.redis.rpush(QUEUE_NAME, json.dumps(status))
+        return True
 
     def get_job_status(self, job_id: str) -> Optional[Dict[str, Any]]:
         if not self.redis:

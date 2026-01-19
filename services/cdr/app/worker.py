@@ -51,6 +51,8 @@ def process_task(task):
         
         use_fallback = policy.force_fallback
         
+        password = task.get('password')
+        
         if not use_fallback:
             try:
                 sanitizer = get_sanitizer(file_type)
@@ -65,7 +67,7 @@ def process_task(task):
                 else:
                     # Run Surgical
                     with open(file_path, "rb") as f_in:
-                        sanitized_content, report = sanitizer.sanitize(f_in, policy)
+                        sanitized_content, report = sanitizer.sanitize(f_in, policy, password=password)
                         
             except Exception as e:
                 logger.error(f"Surgical sanitization failed: {e}")
@@ -85,6 +87,15 @@ def process_task(task):
 
         # Final Check
         if sanitized_content is None:
+            if report and report.requires_password:
+                # SPECIAL CASE: Password Required Interception
+                queue_manager.update_job_status(job_id, "waiting_password", {
+                    "report": [log.dict() for log in report.logs],
+                    "requires_password": True
+                })
+                logger.info(f"Job {job_id} is waiting for password.")
+                return
+
             reason = "Sanitization Failed (Unknown)"
             if report and not report.is_safe:
                 reason = "Blocked by Policy/Security"

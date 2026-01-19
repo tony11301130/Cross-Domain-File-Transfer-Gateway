@@ -5,7 +5,7 @@ from .base import BaseSanitizer
 from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
 
 class ImageSanitizer(BaseSanitizer):
-    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
         report = SanitizationReport()
         try:
             img = Image.open(input_file)
