@@ -26,6 +26,7 @@ services:
       - NEXTAUTH_URL=http://localhost:3000
     volumes:
       - gateway-storage:/app/storage
+      - gateway-db:/app/db
       - ./secure-ingestion-node/prisma:/app/prisma
     depends_on:
       - redis
@@ -38,7 +39,7 @@ services:
       context: ./services/cdr
       dockerfile: Dockerfile
     container_name: cdr-worker
-    command: [ "python", "worker.py" ]
+    command: [ "python", "-m", "app.worker" ]
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
@@ -52,6 +53,7 @@ services:
 
 volumes:
   gateway-storage:
+  gateway-db:
 
 
 networks:

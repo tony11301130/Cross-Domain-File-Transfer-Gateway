@@ -4,6 +4,7 @@ import { NextResponse } from "next/server"
 import { writeFile, mkdir } from "fs/promises"
 import path from "path"
 import { randomUUID } from "crypto"
+import { enqueueJob } from "@/lib/queue"
 
 export async function POST(req: Request) {
     const session = await auth()
@@ -47,6 +48,25 @@ export async function POST(req: Request) {
                 status: "RECEIVED"
             }
         })
+
+        // Enqueue CDR Job
+        if (process.env.NODE_ENV !== 'test') {
+            try {
+                await enqueueJob({
+                    job_id: record.id, // Use DB record ID as Job ID for tracking
+                    file_path: filePath, // Must be absolute path in container: /app/storage/ingress/...
+                    file_type: file.type || 'application/octet-stream',
+                    original_filename: originalName,
+                    timestamp: Date.now() / 1000,
+                    status: 'queued'
+                });
+                console.log(`[Queue] Job ${record.id} enqueued for file ${safeName}`);
+            } catch (queueError) {
+                console.error("[Queue] Failed to enqueue job:", queueError);
+                // Intentionally NOT returning error to user, as file is safe in DB. 
+                // Background retry mechanism would be needed in production.
+            }
+        }
 
         return NextResponse.json({ success: true, fileId: record.id, transactionId })
 

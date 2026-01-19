@@ -4,9 +4,9 @@ import os
 import signal
 import sys
 import logging
-from queue_manager import queue_manager
-from engine import get_sanitizer
-from metrics import FILES_PROCESSED_TOTAL, PROCESSING_DURATION_SECONDS, SANITIZATION_FAILURES_TOTAL
+from .queue_manager import queue_manager
+from .engine import get_sanitizer
+from .metrics import FILES_PROCESSED_TOTAL, PROCESSING_DURATION_SECONDS, SANITIZATION_FAILURES_TOTAL
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
