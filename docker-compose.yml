@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  # 訊息代理人
+  redis:
+    image: redis:alpine
+    container_name: gateway-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - gateway-network
+
+  # 網頁入口 (Next.js)
+  ingestion-web:
+    build:
+      context: ./secure-ingestion-node
+      dockerfile: Dockerfile
+    container_name: ingestion-web
+    ports:
+      - "3000:3000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - DATABASE_URL=file:/app/db/dev.db
+      - NEXTAUTH_SECRET=supersecret123
+      - NEXTAUTH_URL=http://localhost:3000
+    volumes:
+      - gateway-storage:/app/storage
+      - ./secure-ingestion-node/prisma:/app/prisma
+    depends_on:
+      - redis
+    networks:
+      - gateway-network
+
+  # CDR 引擎 (Python)
+  cdr-worker:
+    build:
+      context: ./services/cdr
+      dockerfile: Dockerfile
+    container_name: cdr-worker
+    command: [ "python", "worker.py" ]
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - UPLOAD_DIR=/app/storage/uploads
+    volumes:
+      - gateway-storage:/app/storage
+    depends_on:
+      - redis
+    networks:
+      - gateway-network
+
+volumes:
+  gateway-storage:
+
+
+networks:
+  gateway-network:
+    driver: bridge
