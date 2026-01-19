@@ -23,29 +23,29 @@ def get_sanitizer(mime_type: str) -> Optional[BaseSanitizer]:
     """
     Factory function to get the appropriate sanitizer based on MIME type.
     """
-    # Placeholder for future implementations
-    # In Step 3, we will register concrete sanitizers here.
     
     # Register sanitizers
-    from sanitizers import PDFSanitizer, OfficeSanitizer, ImageSanitizer
+    from sanitizers import PDFSanitizer, SurgicalOfficeSanitizer, ImageSanitizer, RtfSanitizer
     from utils.archive import ArchiveSanitizer
 
     if mime_type == "application/pdf":
         return PDFSanitizer()
         
-    elif mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-        return OfficeSanitizer(mime_type)
-        
-    elif mime_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":
-        return OfficeSanitizer(mime_type)
+    elif mime_type == "application/rtf" or mime_type == "text/rtf":
+        return RtfSanitizer()
 
-    elif mime_type == "application/vnd.openxmlformats-officedocument.presentationml.presentation":
-        return OfficeSanitizer(mime_type)
+    elif mime_type in [
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    ]:
+        # Using Structural/Surgical sanitizer (DocBleach style)
+        return SurgicalOfficeSanitizer(mime_type)
         
     elif mime_type.startswith("image/"):
         return ImageSanitizer()
     
-    elif mime_type in ["application/zip", "application/x-zip-compressed"]:
+    elif mime_type in ["application/zip", "application/x-zip-compressed", "application/x-tar"]:
         # Circular dependency trick: pass get_sanitizer itself
         return ArchiveSanitizer(mime_type, get_sanitizer)
         
