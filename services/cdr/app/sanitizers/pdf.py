@@ -1,10 +1,12 @@
 import io
 import pikepdf
-from typing import Optional, BinaryIO
+from typing import Optional, BinaryIO, Tuple
 from .base import BaseSanitizer
+from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
 
 class PDFSanitizer(BaseSanitizer):
-    def sanitize(self, input_file: BinaryIO) -> Optional[bytes]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+        report = SanitizationReport()
         try:
             # Using pikepdf (QPDF based) for robust structural cleaning
             pdf = pikepdf.open(input_file)
@@ -15,20 +17,31 @@ class PDFSanitizer(BaseSanitizer):
             try:
                 if "/Names" in pdf.Root and "/JavaScript" in pdf.Root.Names:
                     del pdf.Root.Names["/JavaScript"]
+                    report.add_log(ActionEnum.REMOVE, "Removed /JavaScript from Names", "JavaScript")
+                
                 if "/OpenAction" in pdf.Root:
                     del pdf.Root["/OpenAction"]
+                    report.add_log(ActionEnum.REMOVE, "Removed /OpenAction from Root", "OpenAction")
+
                 if "/AA" in pdf.Root: # Additional Actions
                     del pdf.Root["/AA"]
+                    report.add_log(ActionEnum.REMOVE, "Removed /AA from Root", "AA")
+
             except Exception as e:
                 print(f"[PDF] Root cleaning warning: {e}")
+                report.add_log(ActionEnum.FAIL, f"Root cleaning error: {e}", "Structure")
 
             # 2. Iterate Pages
-            for page in pdf.pages:
+            for i, page in enumerate(pdf.pages):
+                page_num = i + 1
                 # Remove Page Actions
                 if "/AA" in page:
                     del page["/AA"]
+                    report.add_log(ActionEnum.REMOVE, "Removed /AA (Additional Actions)", f"Page {page_num}")
+                
                 if "/JS" in page:
                      del page["/JS"]
+                     report.add_log(ActionEnum.REMOVE, "Removed /JS", f"Page {page_num}")
                 
                 # Check Annotations
                 if "/Annots" in page:
@@ -45,18 +58,25 @@ class PDFSanitizer(BaseSanitizer):
                              if "/S" in action:
                                  subtype = str(action.get("/S"))
                                  if any(x in subtype for x in ["JavaScript", "Launch", "ImportData", "SubmitForm", "RichMedia"]):
+                                     report.add_log(ActionEnum.REMOVE, f"Removed risky annotation action: {subtype}", f"Page {page_num}")
                                      continue # Dangerous
                          
                          safe_annots.append(annot)
                     
-                    page.Annots = safe_annots
-
+                    if len(page.Annots) != len(safe_annots):
+                         page.Annots = safe_annots
+ 
             # 3. Save with linearize (Fast Web View) -> reconstructs XREF table
             # and strips unused objects.
             output_buffer = io.BytesIO()
             pdf.save(output_buffer, linearize=True)
-            return output_buffer.getvalue()
+            
+            report.is_safe = True
+            report.method_used = "surgical"
+            return output_buffer.getvalue(), report
             
         except Exception as e:
             print(f"[PDFSanitizer] Error: {e}")
-            return None
+            report.add_log(ActionEnum.FAIL, str(e), "Processing")
+            return None, report
+

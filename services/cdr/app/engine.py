@@ -1,23 +1,5 @@
-import abc
-from typing import Optional, BinaryIO
-
-class BaseSanitizer(abc.ABC):
-    """
-    Abstract base class for all file sanitizers.
-    """
-
-    @abc.abstractmethod
-    def sanitize(self, input_file: BinaryIO) -> Optional[bytes]:
-        """
-        Sanitize the input file and return the sanitized content as bytes.
-        
-        Args:
-            input_file: A file-like object (binary mode) containing the original file.
-            
-        Returns:
-            The sanitized file content as bytes, or None if sanitization fails or is not supported.
-        """
-        pass
+from typing import Optional
+from .sanitizers.base import BaseSanitizer
 
 def get_sanitizer(mime_type: str) -> Optional[BaseSanitizer]:
     """
@@ -25,8 +7,14 @@ def get_sanitizer(mime_type: str) -> Optional[BaseSanitizer]:
     """
     
     # Register sanitizers
-    from sanitizers import PDFSanitizer, SurgicalOfficeSanitizer, ImageSanitizer, RtfSanitizer
-    from utils.archive import ArchiveSanitizer
+    from .sanitizers.pdf import PDFSanitizer
+    from .sanitizers.office_surgical import SurgicalOfficeSanitizer
+    from .sanitizers.image import ImageSanitizer
+    from .sanitizers.rtf import RtfSanitizer
+    from .sanitizers.html import HtmlSanitizer, SvgSanitizer
+    from .sanitizers.email_sanitizer import EmailSanitizer
+    from .sanitizers.archive.sanitizer import ArchiveSanitizer
+    from .sanitizers.text import TextSanitizer
 
     if mime_type == "application/pdf":
         return PDFSanitizer()
@@ -43,10 +31,26 @@ def get_sanitizer(mime_type: str) -> Optional[BaseSanitizer]:
         return SurgicalOfficeSanitizer(mime_type)
         
     elif mime_type.startswith("image/"):
+        if mime_type == "image/svg+xml":
+            return SvgSanitizer()
         return ImageSanitizer()
     
-    elif mime_type in ["application/zip", "application/x-zip-compressed", "application/x-tar"]:
+    elif mime_type in ["text/html", "application/xhtml+xml"]:
+        return HtmlSanitizer(mime_type)
+
+    elif mime_type in ["message/rfc822", "application/vnd.ms-outlook"]:
+        return EmailSanitizer(get_sanitizer)
+
+    elif mime_type in [
+        "application/zip", "application/x-zip-compressed", "application/x-tar", 
+        "application/x-7z-compressed"
+    ]:
         # Circular dependency trick: pass get_sanitizer itself
         return ArchiveSanitizer(mime_type, get_sanitizer)
+    
+    elif mime_type == "text/plain":
+        return TextSanitizer()
         
     return None
+
+

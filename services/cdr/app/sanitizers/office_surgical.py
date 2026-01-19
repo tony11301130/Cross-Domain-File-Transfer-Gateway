@@ -1,11 +1,13 @@
 import io
 import os
-import zipfile
-import tempfile
 import shutil
+import tempfile
 import xml.etree.ElementTree as ET
-from typing import Optional, BinaryIO
+from typing import Optional, BinaryIO, Tuple
 from .base import BaseSanitizer
+from .archive.extractor import ArchiveExtractor
+from .archive.repacker import ArchiveRepacker
+from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
 
 # XML Namespaces typically found in OOXML
 NAMESPACES = {
@@ -20,62 +22,80 @@ NAMESPACES = {
 class SurgicalOfficeSanitizer(BaseSanitizer):
     def __init__(self, mime_type: str):
         self.mime_type = mime_type
+        # Reuse Archive components (Office files are ZIPs)
+        self.extractor = ArchiveExtractor(mime_type)
+        self.repacker = ArchiveRepacker(mime_type)
 
-    def sanitize(self, input_file: BinaryIO) -> Optional[bytes]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+        report = SanitizationReport()
         temp_dir = tempfile.mkdtemp()
+        temp_in_path = None
+        
         try:
-            # 1. Unzip
-            with zipfile.ZipFile(input_file, 'r') as zf:
-                zf.extractall(temp_dir)
+            # Save input to temp file (Extractor needs path)
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_in:
+                shutil.copyfileobj(input_file, tmp_in)
+                temp_in_path = tmp_in.name
+
+            # 1. Unzip with security checks (Zip Bomb, etc)
+            if not self.extractor.safe_extract(temp_in_path, temp_dir):
+                print("[Office] Extraction failed or unsafe file.")
+                report.add_log(ActionEnum.BLOCK, "Unsafe archive structure (ZipBomb?)", "Structure")
+                report.is_safe = False
+                return None, report
 
             # 2. Iterate and Clean
-            self._clean_directory(temp_dir)
+            self._clean_directory(temp_dir, policy, report)
 
             # 3. Rezip
             output_buffer = io.BytesIO()
-            with zipfile.ZipFile(output_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
-                for root, dirs, files in os.walk(temp_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, temp_dir)
-                        zf.write(file_path, arcname)
+            self.repacker.repack(temp_dir, output_buffer)
             
-            return output_buffer.getvalue()
+            report.is_safe = True
+            report.method_used = "surgical"
+            return output_buffer.getvalue(), report
 
-        except zipfile.BadZipFile:
-            print("[Office] Not a valid zip file")
-            return None
         except Exception as e:
             print(f"[Office] Error: {e}")
-            return None
+            report.add_log(ActionEnum.FAIL, str(e), "Processing")
+            return None, report
         finally:
-            shutil.rmtree(temp_dir)
+            if temp_in_path and os.path.exists(temp_in_path):
+                os.remove(temp_in_path)
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
 
-    def _clean_directory(self, root_dir: str):
+    def _clean_directory(self, root_dir: str, policy: SanitizationPolicy, report: SanitizationReport):
         # First, find and remove dangerous files (Macros)
         # vbaProject.bin, vbaData.xml, etc.
         files_to_remove = []
         for root, dirs, files in os.walk(root_dir):
             for file in files:
                 if file.lower().endswith('.bin') or 'vba' in file.lower():
-                    # Likely a macro project. Remove it.
-                    files_to_remove.append(os.path.join(root, file))
+                    if not policy.allow_macros:
+                        # Likely a macro project. Remove it.
+                        files_to_remove.append(os.path.join(root, file))
+                    else:
+                        report.add_log(ActionEnum.PASS, f"Macros allowed by policy: {file}", "Macro")
+
                 elif file.lower().endswith('.xml') or file.lower().endswith('.rels'):
                     # Sanitize XML
-                     self._sanitize_xml(os.path.join(root, file))
+                     self._sanitize_xml(os.path.join(root, file), report)
         
         for f in files_to_remove:
-            print(f"[Office] Removing active content file: {os.path.basename(f)}")
+            fname = os.path.basename(f)
+            print(f"[Office] Removing active content file: {fname}")
+            report.add_log(ActionEnum.REMOVE, f"Removed active content file: {fname}", "Macro")
             os.remove(f)
 
-    def _sanitize_xml(self, file_path: str):
+    def _sanitize_xml(self, file_path: str, report: SanitizationReport):
         try:
             # Register namespaces to avoid excessive ns0 prefixes
             for prefix, uri in NAMESPACES.items():
                 ET.register_namespace(prefix, uri)
                 
             tree = ET.parse(file_path)
-            root = tree.getroot()
+            # root = tree.getroot() # Unused
             modified = False
 
             # Dangerous tags to strip
@@ -85,10 +105,6 @@ class SurgicalOfficeSanitizer(BaseSanitizer):
             # Helper to check and remove recursively
             # Since removing while iterating is tricky, we collect removals
             # But XML is a tree, so we need to traverse.
-            
-            # Simple iteration for first level depth or use recursive walker
-            # ET doesn't have a simple "remove if matches" recursive method.
-            # We assume iterating all elements.
             
             parent_map = {c: p for p in tree.iter() for c in p}
             
@@ -100,15 +116,14 @@ class SurgicalOfficeSanitizer(BaseSanitizer):
                 if tag_name in dangerous_tags:
                     elements_to_remove.append(elem)
                 
-                # Also check for 'v:shape' with 'type' pointing to OLE
-                # or similar attributes
-            
             for elem in elements_to_remove:
                 if elem in parent_map:
                     parent = parent_map[elem]
                     parent.remove(elem)
                     modified = True
-                    print(f"[Office] Removed dangerous tag: {elem.tag} in {os.path.basename(file_path)}")
+                    fname = os.path.basename(file_path)
+                    print(f"[Office] Removed dangerous tag: {elem.tag} in {fname}")
+                    report.add_log(ActionEnum.REMOVE, f"Removed {elem.tag} from {fname}", "ActiveObject")
 
             if modified:
                 tree.write(file_path, encoding='utf-8', xml_declaration=True)
@@ -118,4 +133,6 @@ class SurgicalOfficeSanitizer(BaseSanitizer):
             pass
         except Exception as e:
             print(f"[Office] XML Warning in {os.path.basename(file_path)}: {e}")
+            report.add_log(ActionEnum.FAIL, f"XML parsing error in {os.path.basename(file_path)}: {e}", "XML")
+
 

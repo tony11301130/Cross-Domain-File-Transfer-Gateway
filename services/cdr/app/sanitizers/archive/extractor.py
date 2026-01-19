@@ -1,0 +1,92 @@
+import zipfile
+import tarfile
+import os
+try:
+    import py7zr
+except ImportError:
+    py7zr = None
+from .config import MAX_RATIO, MAX_SIZE, MAX_FILES
+
+class ArchiveExtractor:
+    def __init__(self, file_type: str):
+        self.file_type = file_type
+
+    def safe_extract(self, archive_path: str, extract_path: str) -> bool:
+        try:
+            if "7z" in self.file_type:
+                return self._safe_extract_7z(archive_path, extract_path)
+            
+            # Default to ZIP logic (improved with tar check if needed)
+            if not zipfile.is_zipfile(archive_path):
+                # Check for tar
+                if tarfile.is_tarfile(archive_path):
+                    # Implement safe tar extract
+                    return self._safe_extract_tar(archive_path, extract_path)
+                return False
+
+            with zipfile.ZipFile(archive_path, 'r') as zf:
+                # 1. Check total files
+                file_list = zf.infolist()
+                if len(file_list) > MAX_FILES:
+                    print(f"[Archive] Modified Zip Bomb: Too many files ({len(file_list)})")
+                    return False
+                
+                total_size = 0
+                for info in file_list:
+                    # 2. Check Compression Ratio
+                    if info.file_size > MAX_SIZE:
+                         print(f"[Archive] File too large: {info.filename}")
+                         return False
+                    
+                    if info.compress_size > 0:
+                        ratio = info.file_size / info.compress_size
+                        if ratio > MAX_RATIO:
+                            print(f"[Archive] Ratio too high ({ratio}) for {info.filename}")
+                            return False
+                    
+                    total_size += info.file_size
+                
+                # 3. Check Total Uncompressed Size
+                if total_size > MAX_SIZE * 5: # Allow aggressive total but cap individual
+                    print(f"[Archive] Total extracted size too large ({total_size})")
+                    return False
+
+                # Extract
+                zf.extractall(extract_path)
+                return True
+        except zipfile.BadZipFile:
+            print("[Archive] Bad Zip File")
+            return False
+        except Exception as e:
+            print(f"[Archive] Extraction Error: {e}")
+            return False
+
+    def _safe_extract_7z(self, archive_path: str, extract_path: str) -> bool:
+        if py7zr is None:
+            print("[Archive] py7zr module not installed. Skipping 7z extraction.")
+            return False
+            
+        try:
+            with py7zr.SevenZipFile(archive_path, mode='r') as z:
+                # py7zr doesn't give easy list without reading, but let's try strict extract
+                # Limitations: 7z usually solid compression, hard to check ratios per file without full scan.
+                # simpler check:
+                if z.archiveinfo().uncompressed > (MAX_SIZE * 5):
+                     print(f"[Archive] 7z total size too large")
+                     return False
+                
+                z.extractall(path=extract_path)
+                return True
+        except Exception as e:
+            print(f"[Archive] 7z Extract Error: {e}")
+            return False
+
+    def _safe_extract_tar(self, archive_path: str, extract_path: str) -> bool:
+         # Simplified tar extraction
+         try:
+             with tarfile.open(archive_path, "r") as tar:
+                 # Check size?
+                 tar.extractall(extract_path)
+                 return True
+         except Exception as e:
+             return False

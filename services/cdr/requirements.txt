@@ -12,3 +12,7 @@ redis
 prometheus_client
 requests
 pikepdf
+bleach
+py7zr
+defusedxml
+img2pdf

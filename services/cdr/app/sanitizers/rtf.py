@@ -1,23 +1,33 @@
 import re
-from typing import Optional, BinaryIO
+from typing import Optional, BinaryIO, Tuple
 from .base import BaseSanitizer
+from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
 
 class RtfSanitizer(BaseSanitizer):
-    def sanitize(self, input_file: BinaryIO) -> Optional[bytes]:
+    def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy) -> Tuple[Optional[bytes], SanitizationReport]:
+        report = SanitizationReport()
         try:
             content = input_file.read()
             # RTF is 7-bit ASCII usually, but can have bytes. 
             # We treat it as bytes mostly, but parse control words.
             
             # Simple recursive descent logic to strip {\object ...} groups
-            sanitized = self._strip_dangerous_groups(content)
+            sanitized, count = self._strip_dangerous_groups(content)
             
-            return sanitized
+            if count > 0:
+                 report.add_log(ActionEnum.REMOVE, f"Removed {count} dangerous groups (object/objdata/datastore)", "RTF_Object")
+            else:
+                 report.add_log(ActionEnum.PASS, "No dangerous objects found", "RTF_Structure")
+
+            report.is_safe = True
+            report.method_used = "surgical"
+            return sanitized, report
         except Exception as e:
             print(f"[RTF] Error: {e}")
-            return None
+            report.add_log(ActionEnum.FAIL, str(e), "Processing")
+            return None, report
 
-    def _strip_dangerous_groups(self, data: bytes) -> bytes:
+    def _strip_dangerous_groups(self, data: bytes) -> Tuple[bytes, int]:
         # Dangerous control words that start a group
         # \object, \objdata, \datastore, \do (drawn object)
         DANGEROUS_WORDS = [b'\\object', b'\\objdata', b'\\datastore', b'\\do']
@@ -25,6 +35,7 @@ class RtfSanitizer(BaseSanitizer):
         output = bytearray()
         i = 0
         length = len(data)
+        removed_count = 0
         
         # We process the file copying safe parts to output
         # If we encounter a group '{', we check if it starts with dangerous word.
@@ -55,6 +66,7 @@ class RtfSanitizer(BaseSanitizer):
                         break
                 
                 if is_dangerous:
+                    removed_count += 1
                     # Skip this group
                     # We need to find the matching '}' taking nesting into account
                     depth = 1
@@ -77,4 +89,5 @@ class RtfSanitizer(BaseSanitizer):
                 output.append(char)
                 i += 1
                 
-        return bytes(output)
+        return bytes(output), removed_count
+
