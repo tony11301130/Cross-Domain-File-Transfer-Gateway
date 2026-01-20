@@ -91,6 +91,8 @@ async function SubmitFilePassword(fileId: string, formData: FormData) {
 }
 
 
+import { PasswordModalManager } from "@/components/password-modal-manager"
+
 export default async function DashboardPage() {
     const session = await auth()
     const userRole = (session?.user as any).role
@@ -152,6 +154,9 @@ export default async function DashboardPage() {
     return (
         <main className="min-h-screen p-4 md:p-8 text-slate-200 grid-bg">
             <AutoRefresh />
+
+            {/* Modal Manager for Encrypted Files */}
+            <PasswordModalManager files={files as any} submitAction={SubmitFilePassword} />
 
             <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-700">
 
