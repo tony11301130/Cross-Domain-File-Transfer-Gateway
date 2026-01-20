@@ -12,6 +12,14 @@ export interface CdrJob {
     timestamp: number;
     status: 'queued' | 'processing' | 'completed' | 'failed' | 'waiting_password';
     password?: string;
+    transfer_config?: {
+        enabled: boolean;
+        host: string | null;
+        port: number;
+        username: string | null;
+        password: string | null;
+        target_dir: string | null;
+    } | null;
 }
 
 // Singleton Redis Client

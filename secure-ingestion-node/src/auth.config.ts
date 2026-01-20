@@ -11,7 +11,20 @@ export const authConfig = {
             if (isOnDashboard) {
                 if (isLoggedIn) return true;
                 return false; // Redirect unauthenticated users to login page
-            } else if (isLoggedIn && nextUrl.pathname === '/login') {
+                return false; // Redirect unauthenticated users to login page
+            }
+
+            const isOnAdmin = nextUrl.pathname.startsWith('/admin');
+            if (isOnAdmin) {
+                if (!isLoggedIn) return false;
+                // Ideally check role here, but role is on token which might not be fully available in this limited middleware context without DB.
+                // However, we can check basic auth here, and double check role in Layout/Page.
+                // For stricter middleware role check, we need to decode the token.
+                // Given the auth object has user, let's trust it for existence, but verify role in layout.
+                return true;
+            }
+
+            if (isLoggedIn && nextUrl.pathname === '/login') {
                 return Response.redirect(new URL('/dashboard', nextUrl));
             }
             return true;

@@ -44,6 +44,12 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - UPLOAD_DIR=/app/storage/uploads
+      - ENABLE_TRANSFER=false
+      - TARGET_SERVER_HOST=
+      - TARGET_SERVER_PORT=22
+      - TARGET_SERVER_USER=
+      - TARGET_SERVER_PASSWORD=
+      - TARGET_SERVER_DIR=
     volumes:
       - gateway-storage:/app/storage
     depends_on:

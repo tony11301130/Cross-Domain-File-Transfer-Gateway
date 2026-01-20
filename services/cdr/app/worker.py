@@ -7,6 +7,7 @@ import logging
 from .queue_manager import queue_manager
 from .engine import get_sanitizer
 from .metrics import FILES_PROCESSED_TOTAL, PROCESSING_DURATION_SECONDS, SANITIZATION_FAILURES_TOTAL
+from .utils.transfer import transfer_file_to_remote, FileTransferError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
@@ -108,9 +109,35 @@ def process_task(task):
             raise ValueError(fail_msg)
             
         # Save output
-        output_path = file_path + ".sanitized"
         with open(output_path, "wb") as f_out:
             f_out.write(sanitized_content)
+
+
+        # Transfer Phase
+        transfer_status = "skipped"
+        remote_path = None
+        
+        # DETERMINE CONFIG
+        t_conf = task.get('transfer_config') or {}
+        # Precedence: Task Config > Env Config
+        enable_transfer = t_conf.get('enabled') 
+        if enable_transfer is None:
+             enable_transfer = os.getenv("ENABLE_TRANSFER", "false").lower() == "true"
+        
+        if enable_transfer:
+            try:
+                logger.info("Starting file transfer...")
+                # Use same filename for remote
+                remote_name = os.path.basename(output_path)
+                remote_path = transfer_file_to_remote(output_path, remote_name, config=t_conf)
+                transfer_status = "success"
+                logger.info(f"File transferred successfully to {remote_path}")
+            except Exception as e:
+                # If transfer is critical, we might want to raise here.
+                # For now, we log it and mark status as failed-transfer, but keeps the job "completed" (sanitization done)
+                # Or we can mark job as partial? Let's keep job completed but with transfer info.
+                logger.error(f"Transfer step failed: {e}")
+                transfer_status = "failed"
             
         duration = time.time() - start_time
         PROCESSING_DURATION_SECONDS.labels(file_type=file_type).observe(duration)
@@ -124,7 +151,9 @@ def process_task(task):
             "duration": duration,
             "report": logs,
             "is_safe": report.is_safe,
-            "method": report.method_used
+            "method": report.method_used,
+            "transfer_status": transfer_status,
+            "remote_path": remote_path
         })
         logger.info(f"Job {job_id} completed in {duration:.2f}s using {report.method_used}")
         

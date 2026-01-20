@@ -26,3 +26,14 @@ model FileRecord {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
+
+model TransferConfig {
+  id             String  @id @default("global")
+  enableTransfer Boolean @default(false)
+  host           String?
+  port           Int     @default(22)
+  username       String?
+  password       String?
+  targetDir      String?
+  updatedAt      DateTime @updatedAt
+}

@@ -16,3 +16,4 @@ bleach
 py7zr
 defusedxml
 img2pdf
+paramiko==3.4.0

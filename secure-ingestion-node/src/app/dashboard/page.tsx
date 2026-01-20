@@ -5,16 +5,20 @@ import { Button } from "@/components/ui/button"
 import { revalidatePath } from "next/cache"
 import { AutoRefresh } from "@/components/auto-refresh"
 import { ChangePasswordForm } from "@/components/change-password-form"
-import { UserManagement } from "@/components/user-management"
+// UserManagement import removed - component moved to dedicated page
 import {
     Shield, LogOut, FileText, UserCircle, AlertCircle,
     CheckCircle, Clock, LayoutDashboard, Users, Activity,
-    TrendingUp, ShieldCheck, ShieldAlert
+    TrendingUp, ShieldCheck, ShieldAlert, Lock
 } from "lucide-react"
 import fs from "fs/promises"
 import path from "path"
 import { getRedisClient, submitPassword } from "@/lib/queue"
 
+
+
+import NavigationPill from "@/components/NavigationPill"
+import MainHeader from "@/components/MainHeader"
 
 export const dynamic = 'force-dynamic'
 
@@ -139,7 +143,7 @@ export default async function DashboardPage() {
         }
     }
 
-    const users = userRole === 'admin' ? await prisma.user.findMany({ orderBy: { createdAt: 'desc' } }) : []
+    // User fetching logic removed from dashboard as it is now in a dedicated page
 
 
     // Stats Calculation
@@ -160,42 +164,14 @@ export default async function DashboardPage() {
 
             <div className="mx-auto max-w-7xl space-y-8 animate-in fade-in duration-700">
 
-                {/* Global Header */}
-                <header className="flex flex-col md:flex-row items-center justify-between gap-6 rounded-2xl border border-slate-800 bg-slate-950/40 p-6 backdrop-blur-xl shadow-2xl ring-1 ring-white/5">
-                    <div className="flex items-center gap-5">
-                        <div className="relative group">
-                            <div className="absolute -inset-0.5 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 opacity-30 blur group-hover:opacity-60 transition duration-1000"></div>
-                            <div className="relative flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 border border-slate-700">
-                                <Shield className="h-7 w-7 text-cyan-400" />
-                            </div>
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-black tracking-tight text-white glow-text">GATEWAY_CORE</h1>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]"></span>
-                                <p className="text-xs font-mono text-slate-400 uppercase tracking-widest">System Operational</p>
-                            </div>
-                        </div>
+                {userRole === 'admin' && (
+                    <div className="z-20">
+                        <NavigationPill />
                     </div>
+                )}
 
-                    <div className="flex flex-wrap items-center justify-center gap-3">
-                        <div className="px-4 py-2 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center gap-3">
-                            <UserCircle className="h-4 w-4 text-slate-500" />
-                            <div className="text-left">
-                                <p className="text-xs font-bold text-white leading-none">{session?.user?.name}</p>
-                                <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase">{userRole} ACCESS</p>
-                            </div>
-                        </div>
-                        <div className="h-8 w-px bg-slate-800 hidden md:block"></div>
-                        <ChangePasswordForm />
-                        <form action={SignOut}>
-                            <Button variant="ghost" className="text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors h-10">
-                                <LogOut className="h-4 w-4 mr-2" />
-                                <span className="font-bold text-xs uppercase tracking-tight">Egress</span>
-                            </Button>
-                        </form>
-                    </div>
-                </header>
+                {/* Global Header */}
+                <MainHeader title="GATEWAY_CORE" subtitle="System Operational" icon={Shield} accentColor="cyan" />
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -223,7 +199,7 @@ export default async function DashboardPage() {
                 ) : (
                     <div className="space-y-12">
                         {/* Admin Task Management */}
-                        <div className="grid gap-8 lg:grid-cols-[1fr_400px]">
+                        <div className="grid gap-8">
                             <div className="space-y-6">
                                 <SectionHeader
                                     title="Operational Queue"
@@ -242,16 +218,11 @@ export default async function DashboardPage() {
                                     <DashboardTable files={files.filter(f => f.status !== 'PENDING_APPROVAL')} userRole="admin" />
                                 </div>
                             </div>
-
-                            <div className="space-y-6">
-                                <SectionHeader title="Identity Core" subtitle="User account orchestration" icon={Users} />
-                                <UserManagement users={users} />
-                            </div>
                         </div>
                     </div>
                 )}
             </div>
-        </main>
+        </main >
     )
 }
 
@@ -355,15 +326,18 @@ function DashboardTable({ files, userRole, showActions = false }: { files: any[]
                                                 </>
                                             )}
                                             {userRole === 'user' && file.status === 'WAITING_PASSWORD' && (
-                                                <form action={SubmitFilePassword.bind(null, file.id)} className="flex gap-2">
-                                                    <input
-                                                        type="password"
-                                                        name="password"
-                                                        placeholder="Enter Password"
-                                                        className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[10px] w-32 focus:border-cyan-500 focus:outline-none"
-                                                        required
-                                                    />
-                                                    <Button size="sm" className="bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/20 h-8 px-3 text-[10px] font-black tracking-widest">
+                                                <form action={SubmitFilePassword.bind(null, file.id)} className="flex gap-2 items-center">
+                                                    <div className="relative group/input">
+                                                        <Lock className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-500 group-focus-within/input:text-cyan-400 transition-colors" />
+                                                        <input
+                                                            type="password"
+                                                            name="password"
+                                                            placeholder="Password"
+                                                            className="bg-slate-900/50 border border-slate-700/50 rounded-lg pl-8 pr-2 py-1.5 text-[10px] w-36 focus:border-cyan-500/50 focus:ring-1 focus:ring-cyan-500/20 focus:outline-none transition-all placeholder:text-slate-600 font-mono"
+                                                            required
+                                                        />
+                                                    </div>
+                                                    <Button size="sm" className="bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/20 h-8 px-4 text-[10px] font-black tracking-widest transition-all">
                                                         SUBMIT
                                                     </Button>
                                                 </form>

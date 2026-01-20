@@ -49,6 +49,11 @@ export async function POST(req: Request) {
             }
         })
 
+        // Fetch Transfer Config
+        const transferConfig = await prisma.transferConfig.findUnique({
+            where: { id: 'global' }
+        })
+
         // Enqueue CDR Job
         if (process.env.NODE_ENV !== 'test') {
             try {
@@ -58,7 +63,15 @@ export async function POST(req: Request) {
                     file_type: file.type || 'application/octet-stream',
                     original_filename: originalName,
                     timestamp: Date.now() / 1000,
-                    status: 'queued'
+                    status: 'queued',
+                    transfer_config: transferConfig ? {
+                        enabled: transferConfig.enableTransfer,
+                        host: transferConfig.host,
+                        port: transferConfig.port,
+                        username: transferConfig.username,
+                        password: transferConfig.password,
+                        target_dir: transferConfig.targetDir
+                    } : null
                 });
                 console.log(`[Queue] Job ${record.id} enqueued for file ${safeName}`);
             } catch (queueError) {
