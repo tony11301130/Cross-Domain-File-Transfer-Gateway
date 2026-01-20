@@ -49,22 +49,24 @@ class ArchiveSanitizer:
 
             # Repack
             output_buffer = io.BytesIO()
-            self.repacker.repack(extract_dir, output_buffer)
+            # Pass original password if available to re-encrypt
+            self.repacker.repack(extract_dir, output_buffer, password=password)
+            
             
             report.is_safe = True
             report.method_used = "surgical"
             return output_buffer.getvalue(), report
+
+        except Exception as e:
+            print(f"[ArchiveSanitizer] Error: {e}")
+            report.add_log(ActionEnum.FAIL, str(e), "Processing")
+            return None, report
 
         finally:
             if os.path.exists(tmp_in_path):
                 os.remove(tmp_in_path)
             if os.path.exists(extract_dir):
                 shutil.rmtree(extract_dir)
-
-        except Exception as e:
-            print(f"[ArchiveSanitizer] Error: {e}")
-            report.add_log(ActionEnum.FAIL, str(e), "Processing")
-            return None, report
 
     def _process_directory(self, root_dir: str, policy: SanitizationPolicy, report: SanitizationReport, current_depth: int = 0):
         if current_depth > policy.max_recursion_depth:
