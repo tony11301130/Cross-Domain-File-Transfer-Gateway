@@ -12,7 +12,16 @@
 
 ---
 
-## 2. Current Implementation Status (目前實作狀態)
+## 2. Project Structure
+To keep the root clean, files are organized as follows:
+*   **`app/`**: Core services (API, Worker, Sanitizers).
+*   **`docs/`**: Documentation (e.g., `ROADMAP.md`).
+*   **`scripts/`**: Utility scripts for verification and tools (`verify_redis_flow.py`, `check_zip_structure.py`).
+*   **`tests/`**: Unit tests (`pytest services/cdr/tests`).
+
+---
+
+## 3. Current Implementation Status (目前實作狀態)
 經檢視 `services/cdr` 目錄下的程式碼 (`main.py`, `engine.py`, `sanitizers/`)，目前實作狀態如下 (已完成 DocBleach 功能移植)：
 
 *   **架構**: 非同步 Worker 模式 (FastAPI + Redis/Queue)。支援水平擴展。
@@ -26,7 +35,7 @@
 
 ---
 
-## 3. 已解決的 Missing Requirements (Resolved Gaps)
+## 4. 已解決的 Missing Requirements (Resolved Gaps)
 以下項目已在近期更新中實作：
 
 ### 3.1 壓縮檔支援 (Completed)
@@ -49,7 +58,7 @@
 
 ---
 
-## 4. 剩餘計畫與建議 (Remaining Roadmap)
+## 5. 剩餘計畫與建議 (Remaining Roadmap)
 雖然核心功能已移植，仍可持續優化：
 
 1.  **驗證與測試**: 需針對大量惡意樣本 (Malware Zoo) 進行自動化迴歸測試，確保 Surgical Cleaning 不會破壞正常文件格式。

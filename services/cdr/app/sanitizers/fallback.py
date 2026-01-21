@@ -15,8 +15,9 @@ class FallbackSanitizer(BaseSanitizer):
     Uses 'Dangerzone-like' pixel reconstruction to sanitize files.
     """
     
-    def __init__(self, mime_type: str = "application/octet-stream"):
+    def __init__(self, mime_type: str = "application/octet-stream", extension: str = ""):
         self.mime_type = mime_type
+        self.extension = extension
         self.converter = SafeConverter()
         
     def sanitize(self, input_file: BinaryIO, policy: SanitizationPolicy, password: Optional[str] = None) -> Tuple[Optional[bytes], SanitizationReport]:
@@ -24,7 +25,8 @@ class FallbackSanitizer(BaseSanitizer):
         
         # We need a physical file to process with external tools
         with tempfile.TemporaryDirectory() as temp_dir:
-            input_path = os.path.join(temp_dir, "unknown_input")
+            input_name = f"unknown_input{self.extension}" if self.extension else "unknown_input"
+            input_path = os.path.join(temp_dir, input_name)
             output_path = os.path.join(temp_dir, "safe_output.pdf")
             
             # Write stream to disk

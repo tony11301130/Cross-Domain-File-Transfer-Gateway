@@ -10,6 +10,7 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 QUEUE_NAME = "cdr_tasks"
 RESULT_PREFIX = "cdr_result:"
+RESULTS_QUEUE = "cdr_results"
 
 class QueueManager:
     def __init__(self):
@@ -93,6 +94,10 @@ class QueueManager:
             
         # Update with expiration (reset it)
         self.redis.setex(key, 3600, json.dumps(task))
+
+        # If terminal status, notify results queue
+        if status in ["completed", "failed", "waiting_password"]:
+            self.redis.rpush(RESULTS_QUEUE, job_id)
 
     def dequeue_job(self) -> Optional[Dict[str, Any]]:
         if not self.redis:

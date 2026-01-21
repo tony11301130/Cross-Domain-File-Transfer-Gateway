@@ -9,7 +9,7 @@ sys.path.append(os.getcwd())
 sys.path.append(os.path.join(os.getcwd(), 'app'))
 
 from app.engine import get_sanitizer
-from app.core.models import SanitizationPolicy, SanitizationReport, Action
+from app.core.models import SanitizationPolicy, SanitizationReport, ActionEnum
 
 def test_html_sanitization():
     print("\n--- Testing HTML Sanitizer ---")
@@ -41,7 +41,7 @@ def test_html_sanitization():
         print("FAIL: Script not removed")
         return False
         
-    if report.logs[0].action != Action.CLEANED:
+    if report.logs[0].action != ActionEnum.CLEAN:
          print("FAIL: Log action incorrect")
          return False
 
@@ -68,7 +68,7 @@ def test_svg_sanitization():
         return False
         
     # Check specific log for script removal
-    script_log = next((l for l in report.logs if l.component == "SVG_Cleaner" and l.action == Action.REMOVED), None)
+    script_log = next((l for l in report.logs if l.component == "SVG_Cleaner" and l.action == ActionEnum.REMOVE), None)
     if not script_log:
          print("FAIL: Missing log for script removal")
          return False
@@ -96,7 +96,7 @@ def test_email_sanitization():
     cleaned_msg = email.message_from_bytes(cleaned_bytes)
     
     # Check logs
-    html_log = next((l for l in report.logs if "Body:HTML" in l.component and l.action == Action.CLEANED), None)
+    html_log = next((l for l in report.logs if "Body:HTML" in l.component and l.action == ActionEnum.CLEAN), None)
     if not html_log:
         print("FAIL: Missing HTML body log")
         return False
@@ -128,7 +128,7 @@ def test_office_policy():
             print("FAIL: Macro not removed in strict mode")
             return False
             
-    removed_log = next((l for l in report1.logs if l.component == "Macro" and l.action == Action.REMOVED), None)
+    removed_log = next((l for l in report1.logs if l.component == "Macro" and l.action == ActionEnum.REMOVE), None)
     if not removed_log:
         print("FAIL: Missing Macro removal log")
         return False
@@ -143,7 +143,7 @@ def test_office_policy():
             print("FAIL: Macro removed in lax mode")
             return False
             
-    allowed_log = next((l for l in report2.logs if l.component == "Macro" and l.action == Action.PASSED), None)
+    allowed_log = next((l for l in report2.logs if l.component == "Macro" and l.action == ActionEnum.PASS), None)
     if not allowed_log:
          print("FAIL: Missing Macro allowed log")
          return False

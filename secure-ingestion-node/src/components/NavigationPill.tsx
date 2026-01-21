@@ -10,7 +10,7 @@ export default function NavigationPill() {
     const items = [
         { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
         { name: 'User Management', href: '/admin/users', icon: Users },
-        { name: 'Traffic Logs', href: '#', icon: Activity },
+        { name: 'Traffic Logs', href: '/admin/traffic', icon: Activity },
         { name: 'Statistics', href: '#', icon: BarChart3 },
         { name: 'Settings', href: '/admin/settings', icon: Settings },
     ];

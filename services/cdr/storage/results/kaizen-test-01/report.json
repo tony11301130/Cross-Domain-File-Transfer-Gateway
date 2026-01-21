@@ -1,0 +1,26 @@
+{
+  "job_id": "kaizen-test-01",
+  "timestamp": 1768970490.4015403,
+  "is_safe": true,
+  "method": "surgical",
+  "logs": [
+    {
+      "timestamp": 1768970490.3939621,
+      "file": null,
+      "action": "remove",
+      "details": "Removed /JavaScript from Names",
+      "component": "JavaScript"
+    },
+    {
+      "timestamp": 1768970490.3939621,
+      "file": null,
+      "action": "remove",
+      "details": "Removed /OpenAction from Root",
+      "component": "OpenAction"
+    }
+  ],
+  "files": {
+    "safe": "D:\\user\\Documents\\code\\Cross-Domain-File-Transfer-Gateway\\services\\cdr\\storage\\results\\kaizen-test-01\\safe\\test_file.pdf",
+    "original": "D:\\user\\Documents\\code\\Cross-Domain-File-Transfer-Gateway\\services\\cdr\\storage\\results\\kaizen-test-01\\original\\test_file.pdf"
+  }
+}

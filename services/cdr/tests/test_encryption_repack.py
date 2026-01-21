@@ -10,7 +10,13 @@ try:
     from app.sanitizers.archive.repacker import ArchiveRepacker
 except ImportError:
     # Adjust path if run from different location
-    sys.path.append("d:/user/Documents/code/Cross-Domain-File-Transfer-Gateway/services/cdr")
+    # Was: d:/user/Documents/code/Cross-Domain-File-Transfer-Gateway/services/cdr
+    # Now: d:/user/Documents/code/Cross-Domain-File-Transfer-Gateway/services/cdr/tests
+    # We need to go up 4 levels to get to root if we want absolute path from relative...
+    # But let's just use the absolute path approach or adjust relative.
+    # The original relative path was: os.path.join(os.path.dirname(__file__), "../../../")
+    # Now it should be "../../../../"
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../")))
     from app.sanitizers.archive.repacker import ArchiveRepacker
 
 def test_repack_with_encryption():

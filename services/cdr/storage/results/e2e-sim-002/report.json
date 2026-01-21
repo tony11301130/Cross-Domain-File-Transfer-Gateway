@@ -1,0 +1,11 @@
+{
+  "job_id": "e2e-sim-002",
+  "timestamp": 1768972825.8999524,
+  "is_safe": true,
+  "method": "surgical",
+  "logs": [],
+  "files": {
+    "safe": "D:\\user\\Documents\\code\\Cross-Domain-File-Transfer-Gateway\\services\\cdr\\storage\\results\\e2e-sim-002\\safe\\secret_plans.pdf",
+    "original": "D:\\user\\Documents\\code\\Cross-Domain-File-Transfer-Gateway\\services\\cdr\\storage\\results\\e2e-sim-002\\original\\secret_plans.pdf"
+  }
+}

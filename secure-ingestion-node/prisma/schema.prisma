@@ -23,6 +23,8 @@ model FileRecord {
   status      String   @default("RECEIVED") // RECEIVED, SCANNING, PENDING_APPROVAL, TRANSFERRED, QUARANTINED, REJECTED
   uploaderId  String
   uploader    User     @relation(fields: [uploaderId], references: [id])
+  approverId  String?
+  cdrReport   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }

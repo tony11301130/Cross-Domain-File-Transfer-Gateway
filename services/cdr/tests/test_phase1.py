@@ -9,6 +9,7 @@ sys.path.append(os.getcwd())
 sys.path.append(os.path.join(os.getcwd(), 'app'))
 
 from app.engine import get_sanitizer
+from app.core.models import SanitizationPolicy, ActionEnum
 
 def test_html_sanitization():
     print("\n--- Testing HTML Sanitizer ---")
@@ -28,7 +29,8 @@ def test_html_sanitization():
         print("FAIL: No sanitizer for text/html")
         return False
     
-    cleaned = sanitizer.sanitize(f)
+    policy = SanitizationPolicy()
+    cleaned, report = sanitizer.sanitize(f, policy)
     if not cleaned:
         print("FAIL: Sanitization returned None")
         return False
@@ -60,7 +62,8 @@ def test_svg_sanitization():
         print("FAIL: No sanitizer for image/svg+xml")
         return False
         
-    cleaned = sanitizer.sanitize(f)
+    policy = SanitizationPolicy()
+    cleaned, report = sanitizer.sanitize(f, policy)
     if not cleaned:
         print("FAIL: Sanitization returned None")
         return False
@@ -106,7 +109,8 @@ def test_email_sanitization():
         print("FAIL: No sanitizer for message/rfc822")
         return False
         
-    cleaned_bytes = sanitizer.sanitize(f)
+    policy = SanitizationPolicy()
+    cleaned_bytes, report = sanitizer.sanitize(f, policy)
     if not cleaned_bytes:
         print("FAIL: Sanitization returned None")
         return False
@@ -167,7 +171,8 @@ def test_7z_sanitization():
     # If text/plain has no sanitizer, test.txt is removed.
     # The 7z might be empty.
     
-    cleaned = sanitizer.sanitize(f_io)
+    policy = SanitizationPolicy()
+    cleaned, report = sanitizer.sanitize(f_io, policy)
     if os.path.exists('test.7z'):
         os.remove('test.7z')
 
@@ -211,7 +216,8 @@ def test_office_sanitization():
         print("FAIL: No sanitizer for Office")
         return False
         
-    cleaned = sanitizer.sanitize(f_io)
+    policy = SanitizationPolicy()
+    cleaned, report = sanitizer.sanitize(f_io, policy)
     if not cleaned:
         print("FAIL: Sanitization returned None")
         return False

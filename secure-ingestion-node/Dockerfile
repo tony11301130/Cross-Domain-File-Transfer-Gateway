@@ -1,5 +1,5 @@
 FROM node:18-alpine AS base
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl su-exec
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -59,7 +59,10 @@ COPY worker ./worker
 COPY --chown=nextjs:nodejs start.sh ./
 RUN chmod +x start.sh
 
-USER nextjs
+# Create directories and set permissions before switching user
+RUN mkdir -p /app/db /app/storage && chown -R nextjs:nodejs /app/db /app/storage
+
+# USER nextjs
 
 EXPOSE 3000
 
